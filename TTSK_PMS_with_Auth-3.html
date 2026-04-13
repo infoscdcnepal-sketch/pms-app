@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTSK PMS v4 — 鉄骨工事プロジェクト管理</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1524;--bg2:#1a2640;--bg3:#243352;--border:#2d3f5a;--accent:#4f8ef7;--text:#e8edf5;--muted:#7a91b0;--today:#f43f5e;--ok:#10b981;--warn:#f59e0b;--danger:#ef4444;--c1:#4f8ef7;--c2:#f59e0b;--c3:#10b981;--c4:#a78bfa}
+body{font-family:'Segoe UI','Yu Gothic UI','Meiryo',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* HEADER */
+.hdr{background:linear-gradient(135deg,#1a2e50,#0d1e38);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:14px;flex-shrink:0}
+.logo{font-size:18px;font-weight:800;color:var(--accent)}.logo span{color:#f59e0b}
+.tag{font-size:11px;color:var(--muted)}.sp{flex:1}
+.hdr-r{text-align:right;font-size:11px;color:var(--muted)}
+
+/* TABS */
+.tabs{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 18px;display:flex;flex-shrink:0}
+.tab{padding:10px 20px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit;border-bottom:2px solid transparent;transition:all .2s}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}.tab:hover:not(.on){color:var(--text)}
+
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+/* ═══ INPUT PAGE ═══ */
+#pgInput{flex:1;display:flex;overflow:hidden}
+.ip-left{width:340px;min-width:340px;border-right:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden}
+.ip-left-hdr{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.ip-left-hdr span{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:5px 11px;font-size:11px;font-family:inherit;cursor:pointer;font-weight:600}.btn:hover{background:#3b7ae3}
+.btn-sm{padding:3px 8px;font-size:10px;border-radius:4px}
+.btn-red{background:var(--danger)}.btn-red:hover{background:#dc2626}
+.btn-ghost{background:var(--bg3);color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--accent)}
+
+/* Project tree */
+.ptree{flex:1;overflow-y:auto;padding:6px}
+.pt-proj{margin-bottom:2px}
+.pt-row{padding:7px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px;border:1px solid transparent;transition:all .12s;font-size:12px}
+.pt-row:hover{background:var(--bg3)}
+.pt-row.sel{background:rgba(79,142,247,.1);border-color:rgba(79,142,247,.35)}
+.pt-id{font-size:10px;color:var(--muted);font-weight:600;width:52px;flex-shrink:0}
+.pt-nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-st{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px}
+.st-ok{background:rgba(16,185,129,.15);color:var(--ok)}
+.st-risk{background:rgba(239,68,68,.15);color:var(--danger)}
+.st-na{background:var(--bg3);color:var(--muted)}
+.pt-sub{padding-left:22px}
+.pt-sub .pt-row{font-size:11px;padding:5px 10px}
+.pt-sub .pt-id{width:20px;color:var(--accent);font-size:10px}
+
+/* Right form */
+.ip-right{flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)}
+.form-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px}
+.form-hdr{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.form-hdr .pt-st{font-size:10px}
+
+.sec{margin-bottom:20px}
+.sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.f{display:flex;flex-direction:column;gap:3px}
+.f label{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.f input{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:13px;font-family:inherit}
+.f input:focus{outline:none;border-color:var(--accent)}
+.f input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.6);cursor:pointer}
+.f-full{grid-column:1/-1}
+.f .unit{font-size:10px;color:var(--muted);margin-left:4px}
+.f-inline{flex-direction:row;align-items:center;gap:8px}
+.f-inline input{width:80px}
+
+.info-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-top:10px}
+.info-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0}
+.info-row .lbl{color:var(--muted)}.info-row .val{font-weight:700}
+.info-row.warn .val{color:var(--danger)}
+.info-row.ok .val{color:var(--ok)}
+.status-big{font-size:14px;font-weight:800;padding:8px 14px;border-radius:6px;text-align:center;margin-top:8px}
+.status-big.ok{background:rgba(16,185,129,.1);color:var(--ok);border:1px solid rgba(16,185,129,.3)}
+.status-big.risk{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+
+.dtag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;color:#fff;font-weight:600}
+.d1{background:var(--c1)}.d2{background:var(--c2)}.d3{background:var(--c3)}.d4{background:var(--c4)}
+
+/* Sub-project list inside form */
+.sp-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.sp-row{padding:6px 10px;border-radius:5px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:6px;border:1px solid transparent}
+.sp-row:hover{background:var(--bg3)}.sp-row.sel{background:rgba(79,142,247,.1);border-color:rgba(79,142,247,.3)}
+.sp-dot{width:6px;height:6px;border-radius:50%}
+.sp-btns{display:flex;gap:4px;margin-bottom:10px}
+
+.form-actions{display:flex;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--border)}
+.form-actions .btn{padding:8px 20px;font-size:13px}
+
+/* ═══ GANTT PAGE ═══ */
+#pgGantt{flex:1;display:none;flex-direction:column;overflow:hidden}
+#pgGantt.on{display:flex}
+.gt{padding:7px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;background:var(--bg2);flex-shrink:0}
+.gt label{font-size:11px;color:var(--muted)}
+.gt select{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 8px;font-size:12px;font-family:inherit;cursor:pointer}
+.gt .zi{font-size:11px;color:var(--muted);margin-left:auto}
+.gs{flex:1;overflow:auto;background:var(--bg)}
+canvas#gc{display:block;cursor:default}
+.gl{padding:6px 16px;display:flex;gap:14px;align-items:center;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.li{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}.lsw{width:12px;height:8px;border-radius:2px}
+.ldiv{width:1px;height:12px;background:var(--border)}
+.ltdy{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--today)}.ltl{width:12px;height:2px;background:var(--today);border-radius:1px}
+
+/* ═══ WORKLOAD PAGE ═══ */
+#pgWork{flex:1;display:none;overflow-y:auto;padding:22px 24px}
+#pgWork.on{display:block}
+.wh{margin-bottom:20px}.wt{font-size:18px;font-weight:700}.ws2{font-size:12px;color:var(--muted);margin-top:4px}
+.sr{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;border-top:3px solid}
+.sc .sl{font-size:11px;color:var(--muted)}.sc .sv{font-size:22px;font-weight:800;margin-top:4px}.sc .ss{font-size:10px;color:var(--muted);margin-top:2px}
+.wc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+.wc h3{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+.wt2{width:100%;border-collapse:collapse;font-size:11px}
+.wt2 th{text-align:left;padding:5px 8px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:700;font-size:10px}
+.wt2 td{padding:5px 8px;border-bottom:1px solid rgba(45,63,90,.5)}.wt2 tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;color:#fff}
+
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ═══ AUTH LAYER ═══ */
+#authScreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column}
+#authScreen.hidden{display:none}
+#appShell{display:none;flex-direction:column;height:100vh}
+#appShell.visible{display:flex}
+.auth-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:36px 32px;width:380px;max-width:90vw}
+.auth-logo{text-align:center;margin-bottom:24px}
+.auth-logo .logo{font-size:28px;font-weight:800;color:var(--accent);display:inline}.auth-logo .logo span{color:#f59e0b}
+.auth-logo p{font-size:11px;color:var(--muted);margin-top:4px}
+.auth-tabs{display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.auth-tab{flex:1;padding:9px;text-align:center;background:var(--bg3);color:var(--muted);border:none;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600;transition:all .2s}
+.auth-tab.on{background:var(--accent);color:#fff}
+.auth-field{margin-bottom:14px}
+.auth-field label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.auth-field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-size:13px;font-family:inherit}
+.auth-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,142,247,.2)}
+.auth-btn{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-family:inherit;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s}
+.auth-btn:hover{background:#3b7ae3}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-msg{margin-top:12px;padding:8px 12px;border-radius:6px;font-size:11px;display:none}
+.auth-msg.err{display:block;background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.25)}
+.auth-msg.ok{display:block;background:rgba(16,185,129,.12);color:var(--ok);border:1px solid rgba(16,185,129,.25)}
+.auth-footer{text-align:center;margin-top:16px;font-size:10px;color:var(--muted)}
+.logout-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:4px 12px;font-size:10px;font-family:inherit;cursor:pointer;font-weight:600;transition:all .2s}
+.logout-btn:hover{border-color:var(--danger);color:var(--danger)}
+.user-pill{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.user-dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+</style>
+</head>
+<body>
+
+<!-- ═══ AUTH SCREEN (shown first) ═══ -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="logo">TTSK <span>PMS</span></div>
+      <p>鉄骨工事 プロジェクト管理システム v4.0</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" onclick="switchAuthTab('login')">ログイン</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup')">新規登録</button>
+    </div>
+    <form id="authForm" onsubmit="return handleAuth(event)">
+      <div class="auth-field" id="nameField" style="display:none">
+        <label>表示名 (Display Name)</label>
+        <input type="text" id="authName" placeholder="山田太郎" autocomplete="name">
+      </div>
+      <div class="auth-field">
+        <label>メールアドレス (Email)</label>
+        <input type="email" id="authEmail" placeholder="you@company.com" required autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label>パスワード (Password)</label>
+        <input type="password" id="authPass" placeholder="6文字以上" required minlength="6" autocomplete="current-password">
+      </div>
+      <button type="submit" class="auth-btn" id="authSubmit">ログイン</button>
+      <div class="auth-msg" id="authMsg"></div>
+    </form>
+    <div class="auth-footer">Powered by Supabase Auth</div>
+  </div>
+</div>
+
+<!-- ═══ APP SHELL (hidden until logged in) ═══ -->
+<div id="appShell">
+
+<div class="hdr">
+  <div class="logo">TTSK <span>PMS</span></div>
+  <div class="tag">鉄骨工事 プロジェクト管理システム v4.0</div>
+  <div class="sp"></div>
+  <div class="user-pill" id="userPill">
+    <span class="user-dot"></span>
+    <span id="userName">—</span>
+    <button class="logout-btn" onclick="handleLogout()">ログアウト</button>
+  </div>
+  <div class="hdr-r" id="hdrInfo"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="showPage('input',this)">📋 プロジェクト管理</button>
+  <button class="tab" onclick="showPage('gantt',this)">📊 ガントチャート</button>
+  <button class="tab" onclick="showPage('work',this)">📈 工数分析</button>
+</div>
+
+<div class="main">
+  <!-- ═══ INPUT PAGE ═══ -->
+  <div id="pgInput">
+    <div class="ip-left">
+      <div class="ip-left-hdr">
+        <span>プロジェクト一覧</span>
+        <button class="btn btn-sm" onclick="addProj().catch(e=>console.error('[PMS] addProj failed:',e))">＋ 新規PJ</button>
+      </div>
+      <div class="ptree" id="ptree"></div>
+    </div>
+    <div class="ip-right" id="ipRight">
+      <div class="form-empty">← プロジェクトを選択してください</div>
+    </div>
+  </div>
+
+  <!-- ═══ GANTT PAGE ═══ -->
+  <div id="pgGantt">
+    <div class="gt">
+      <label>ズーム:</label>
+      <select id="zSel" onchange="renderGantt()">
+        <option value="6">最詳細</option><option value="5">詳細</option>
+        <option value="4" selected>標準</option><option value="3">広域</option><option value="2">遠景</option>
+      </select>
+      <span class="zi" id="zInfo"></span>
+    </div>
+    <div class="gs" id="gScroll"><canvas id="gc"></canvas></div>
+    <div class="gl">
+      <div class="li"><div class="lsw" style="background:var(--c1)"></div>設計部</div><div class="ldiv"></div>
+      <div class="li"><div class="lsw" style="background:var(--c2)"></div>調達部</div><div class="ldiv"></div>
+      <div class="li"><div class="lsw" style="background:var(--c3)"></div>工場</div><div class="ldiv"></div>
+      <div class="li"><div class="lsw" style="background:var(--c4)"></div>工事部</div><div class="ldiv"></div>
+      <div class="li" style="color:#f59e0b">▨ オーバーラップ</div><div class="ldiv"></div>
+      <div class="li" style="color:var(--ok)">✅ 正常</div>
+      <div class="li" style="color:var(--danger)">⚠ リスク</div><div class="ldiv"></div>
+      <div class="ltdy"><div class="ltl"></div>今日</div><div class="ldiv"></div>
+      <div class="li"><strong style="color:#fff">◆</strong> マイルストーン(日付付)</div>
+    </div>
+  </div>
+
+  <!-- ═══ WORKLOAD PAGE ═══ -->
+  <div id="pgWork">
+    <div class="wh"><div class="wt">工数分析レポート</div><div class="ws2" id="wlRange"></div></div>
+    <div class="sr" id="statRow"></div>
+    <div class="wc"><h3>月別 部門稼働サブPJ数</h3><canvas id="wlBar" height="80"></canvas></div>
+    <div class="wc"><h3>プロジェクト一覧</h3><table class="wt2" id="wlTbl"></table></div>
+  </div>
+</div>
+
+</div><!-- /appShell -->
+
+<script>
+// ═══════════════════════════════════════════════════
+const DN=['設計部','調達部','工場','工事部'];
+const DC={'設計部':{color:'#4f8ef7'},'調達部':{color:'#f59e0b'},'工場':{color:'#10b981'},'工事部':{color:'#a78bfa'}};
+const KEY_NAMES={approval:'承諾予定',order:'材料発注',fabrication:'製作開始',delivery:'現場搬入'};
+const KEY_DEPT={approval:'設計部',order:'調達部',fabrication:'工場',delivery:'工場'};
+const KEY_COLORS={approval:'#4f8ef7',order:'#f59e0b',fabrication:'#10b981',delivery:'#10b981'};
+
+function addD(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
+function fmt(d){return d.toISOString().slice(0,10)}
+function fmtS(d){return(d.getMonth()+1)+'/'+d.getDate()}
+function par(s){return s?new Date(s+'T00:00:00'):null}
+function dB(a,b){return Math.round((b-a)/864e5)}
+
+// ═══════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════
+let projects=[],selProjId=null,selSubIdx=0,wlBarI=null,projCtr=1;
+
+function calcSub(s){
+  const st=par(s.startDate),dl=par(s.deliveryDate);
+  if(!st||!dl)return;
+  const avail=dB(st,dl);
+  const need=s.dur['設計部']+s.dur['調達部']+s.dur['工場'];
+  s.available=avail; s.needed=need;
+  s.status=need<=avail?'ok':'risk';
+
+  const sk_st=st, sk_end=addD(st,s.dur['設計部']);
+  const kj_end=dl, kj_st=addD(dl,-s.dur['工場']);
+  const ki_st=dl, ki_end=addD(dl,s.dur['工事部']);
+
+  if(s.status==='ok'){
+    // Sequential — gap may arise between 調達部.end and 工場.start
+    const ct_st=sk_end, ct_end=addD(sk_end,s.dur['調達部']);
+    s.phases={'設計部':{start:sk_st,end:sk_end},'調達部':{start:ct_st,end:ct_end},'工場':{start:kj_st,end:kj_end},'工事部':{start:ki_st,end:ki_end}};
+  } else {
+    // Risky — overlaps needed
+    const space=dB(sk_end,kj_st); // space available for 調達部
+    const excess=s.dur['調達部']-space; // how much overlap needed
+    const ol1=Math.ceil(excess/2);  // overlap with 設計部
+    const ol2=Math.floor(excess/2); // overlap with 工場
+    const ct_st=addD(sk_end,-ol1), ct_end=addD(ct_st,s.dur['調達部']);
+    s.phases={'設計部':{start:sk_st,end:sk_end},'調達部':{start:ct_st,end:ct_end},'工場':{start:kj_st,end:kj_end},'工事部':{start:ki_st,end:ki_end}};
+    s.overlap={ol1,ol2};
+  }
+}
+
+function calcProj(p){
+  p.subs.forEach(s=>calcSub(s));
+  let mn=null,mx=null;
+  p.subs.forEach(s=>{if(!s.phases||!s.phases['設計部'])return;DN.forEach(dn=>{const ph=s.phases[dn];if(!mn||ph.start<mn)mn=ph.start;if(!mx||ph.end>mx)mx=ph.end})});
+  p.oStart=mn;p.oEnd=mx;
+  // Project-level status: risky if any sub is risky
+  p.status=p.subs.some(s=>s.status==='risk')?'risk':'ok';
+}
+
+function mkSub(name,sd,dd,ds,dc,dk,dki,kAppr,kOrd,kFab){
+  return{name,startDate:sd,deliveryDate:dd,dur:{'設計部':ds,'調達部':dc,'工場':dk,'工事部':dki},
+    keyDates:{approval:kAppr||'',order:kOrd||'',fabrication:kFab||'',delivery:dd},
+    phases:{},status:'ok',available:0,needed:0,overlap:{ol1:0,ol2:0}};
+}
+
+// Data now loaded from Supabase (no hardcoded dummy data)
+// projects[] is populated by fetchProjects() after login
+
+// ═══════════════════════════════════════════════════
+//  PAGE SWITCHING
+// ═══════════════════════════════════════════════════
+function showPage(pg,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
+  document.getElementById('pgInput').style.display=pg==='input'?'flex':'none';
+  const g=document.getElementById('pgGantt');g.classList.toggle('on',pg==='gantt');
+  const w=document.getElementById('pgWork');w.classList.toggle('on',pg==='work');
+  if(pg==='gantt')renderGantt();
+  if(pg==='work')renderWorkload();
+}
+
+// ═══════════════════════════════════════════════════
+//  PROJECT TREE (left panel of input page)
+// ═══════════════════════════════════════════════════
+function renderTree(){
+  const el=document.getElementById('ptree');el.innerHTML='';
+  projects.forEach(p=>{
+    const wrap=document.createElement('div');wrap.className='pt-proj';
+    // Project row
+    const pr=document.createElement('div');
+    pr.className='pt-row'+(selProjId===p.id&&selSubIdx===-1?' sel':'');
+    const stCls=p.status==='ok'?'st-ok':'st-risk';
+    const stTxt=p.status==='ok'?'✅ 正常':'⚠ リスク';
+    pr.innerHTML=`<span class="pt-id">${p.id}</span><span class="pt-nm">${p.name}</span><span class="pt-st ${stCls}">${stTxt}</span>`;
+    pr.onclick=()=>{selProjId=p.id;selSubIdx=-1;renderTree();renderForm()};
+    wrap.appendChild(pr);
+    // Sub-project rows
+    const subWrap=document.createElement('div');subWrap.className='pt-sub';
+    p.subs.forEach((s,i)=>{
+      const sr2=document.createElement('div');
+      sr2.className='pt-row'+(selProjId===p.id&&selSubIdx===i?' sel':'');
+      const sCls=s.status==='ok'?'st-ok':'st-risk';
+      const sTxt=s.status==='ok'?'✅ 正常':'⚠ リスク';
+      sr2.innerHTML=`<span class="pt-id">└</span><span class="pt-nm">${s.name}</span><span class="pt-st ${sCls}">${sTxt}</span>`;
+      sr2.onclick=(e)=>{e.stopPropagation();selProjId=p.id;selSubIdx=i;renderTree();renderForm()};
+      subWrap.appendChild(sr2);
+    });
+    wrap.appendChild(subWrap);
+    el.appendChild(wrap);
+  });
+  document.getElementById('hdrInfo').innerHTML=`今日: ${fmt(new Date())} ｜ ${projects.length} PJ / ${projects.reduce((a,p)=>a+p.subs.length,0)} サブPJ`;
+}
+
+// ═══════════════════════════════════════════════════
+//  INPUT FORM (right panel of input page)
+// ═══════════════════════════════════════════════════
+function renderForm(){
+  const el=document.getElementById('ipRight');
+  if(!selProjId){el.innerHTML='<div class="form-empty">← プロジェクトを選択してください</div>';return}
+  const p=projects.find(x=>x.id===selProjId);if(!p)return;
+
+  // Project-level edit (selSubIdx === -1)
+  if(selSubIdx===-1){
+    el.innerHTML=`
+      <div class="form-hdr">${p.id} ${p.name} <span class="pt-st ${p.status==='ok'?'st-ok':'st-risk'}">${p.status==='ok'?'✅ 正常':'⚠ リスク'}</span></div>
+      <div class="sec"><div class="sec-title">プロジェクト情報</div>
+        <div class="fg"><div class="f"><label>プロジェクト番号</label><input id="fId" value="${p.id}"></div>
+        <div class="f"><label>プロジェクト名称</label><input id="fNm" value="${p.name}"></div></div>
+      </div>
+      <div class="sec"><div class="sec-title">サブプロジェクト</div>
+        <div class="sp-list">${p.subs.map((s,i)=>{
+          const sc=s.status==='ok'?'st-ok':'st-risk';const st=s.status==='ok'?'✅':'⚠';
+          return`<div class="sp-row" onclick="selSubIdx=${i};renderTree();renderForm()"><span class="sp-dot" style="background:${s.status==='ok'?'var(--ok)':'var(--danger)'}"></span><span style="flex:1">${s.name}</span><span class="pt-st ${sc}">${st}</span><span style="font-size:10px;color:var(--muted);margin-left:8px">搬入:${s.deliveryDate}</span></div>`;
+        }).join('')}</div>
+        <div class="sp-btns"><button class="btn btn-sm btn-ghost" onclick="addSub().catch(e=>console.error('[PMS] addSub failed:',e))">＋ サブPJ追加</button></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="saveProjInfo().catch(e=>console.error('[PMS] saveProjInfo failed:',e))">✔ 保存</button>
+        <button class="btn btn-red" onclick="delProj().catch(e=>console.error('[PMS] delProj failed:',e))">✕ プロジェクト削除</button>
+      </div>`;
+    return;
+  }
+
+  // Sub-project edit
+  const s=p.subs[selSubIdx];if(!s)return;
+  const avail=s.available||0,need=s.needed||0;
+  const diff=avail-need;
+  const stBig=s.status==='ok'
+    ?`<div class="status-big ok">✅ 正常 — 余裕 ${diff}日</div>`
+    :`<div class="status-big risk">⚠ リスク — ${Math.abs(diff)}日 不足（オーバーラップ発生）</div>`;
+
+  el.innerHTML=`
+    <div class="form-hdr">${p.id} ▸ ${s.name} <span class="pt-st ${s.status==='ok'?'st-ok':'st-risk'}">${s.status==='ok'?'✅ 正常':'⚠ リスク'}</span></div>
+
+    <div class="sec"><div class="sec-title">📌 基準日</div>
+      <div class="fg">
+        <div class="f"><label>着工日（プロジェクト開始）</label><input type="date" id="fSD" value="${s.startDate}"></div>
+        <div class="f"><label>現場搬入日（工場→現場）</label><input type="date" id="fDD" value="${s.deliveryDate}"></div>
+        <div class="f"><label>サブプロジェクト名称</label><input id="fSN" value="${s.name}"></div>
+      </div>
+    </div>
+
+    <div class="sec"><div class="sec-title">⏱ 部門所要期間</div>
+      <div class="fg">
+        <div class="f"><label><span class="dtag d1">設計部</span> 設計・承諾取得</label><div style="display:flex;align-items:center;gap:4px"><input type="number" id="fDs" value="${s.dur['設計部']}" min="1" style="width:80px"><span class="unit">日間</span></div></div>
+        <div class="f"><label><span class="dtag d2">調達部</span> 調達・加工手配</label><div style="display:flex;align-items:center;gap:4px"><input type="number" id="fDc" value="${s.dur['調達部']}" min="1" style="width:80px"><span class="unit">日間</span></div></div>
+        <div class="f"><label><span class="dtag d3">工場</span> 製作・検査</label><div style="display:flex;align-items:center;gap:4px"><input type="number" id="fDk" value="${s.dur['工場']}" min="1" style="width:80px"><span class="unit">日間</span></div></div>
+        <div class="f"><label><span class="dtag d4">工事部</span> 現場施工</label><div style="display:flex;align-items:center;gap:4px"><input type="number" id="fDi" value="${s.dur['工事部']}" min="1" style="width:80px"><span class="unit">日間</span></div></div>
+      </div>
+      <div class="info-box">
+        <div class="info-row"><span class="lbl">着工日 〜 現場搬入日（利用可能期間）</span><span class="val">${avail} 日間</span></div>
+        <div class="info-row"><span class="lbl">設計部＋調達部＋工場（必要期間）</span><span class="val">${need} 日間</span></div>
+        <div class="info-row ${diff>=0?'ok':'warn'}"><span class="lbl">差分</span><span class="val">${diff>=0?'+'+diff:diff} 日</span></div>
+        ${stBig}
+      </div>
+    </div>
+
+    <div class="sec"><div class="sec-title">🔑 主要マイルストーン（任意入力）</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px">日付が判明次第入力してください。ガントチャートに表示されます。</p>
+      <div class="fg">
+        <div class="f"><label><span class="dtag d1">承諾予定日</span></label><input type="date" id="fKA" value="${s.keyDates.approval}"></div>
+        <div class="f"><label><span class="dtag d2">材料発注日</span></label><input type="date" id="fKO" value="${s.keyDates.order}"></div>
+        <div class="f"><label><span class="dtag d3">製作開始日</span></label><input type="date" id="fKF" value="${s.keyDates.fabrication}"></div>
+        <div class="f"><label><span class="dtag d3">現場搬入日</span></label><input type="date" value="${s.deliveryDate}" disabled style="opacity:.6"></div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn" onclick="saveSubInfo().catch(e=>console.error('[PMS] saveSubInfo failed:',e))">✔ 保存・再計算</button>
+      ${p.subs.length>1?`<button class="btn btn-red" onclick="delSub().catch(e=>console.error('[PMS] delSub failed:',e))">✕ サブPJ削除</button>`:''}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  SUPABASE DATA LAYER
+//  Replaces local array mutations with DB operations.
+//  After every DB write, we re-fetch all data so
+//  projects[] stays perfectly in sync.
+// ═══════════════════════════════════════════════════
+
+// ── Fetch all projects + sub_projects from Supabase → fill projects[] ──
+async function fetchProjects() {
+  console.log('[PMS] fetchProjects() — loading from Supabase...');
+  const { data, error } = await sb
+    .from('projects')
+    .select('*, sub_projects(*)')
+    .order('project_code', { ascending: true });
+
+  if (error) {
+    console.error('[PMS] fetchProjects ERROR:', error);
+    console.error('[PMS] Check: Are SUPABASE_URL and SUPABASE_ANON set correctly?');
+    projects = [];
+    return;
+  }
+  if (!data) {
+    console.warn('[PMS] fetchProjects returned null data — using empty array');
+    projects = [];
+    return;
+  }
+  console.log('[PMS] Raw Supabase response:', data);
+
+  // Map Supabase rows → same shape as original projects[]
+  projects = data.map(p => {
+    const subs = (p.sub_projects || [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(sp => {
+        // Rebuild dur{} from JSONB durations column
+        const dur = sp.durations || {};
+        // Rebuild keyDates{} from JSONB key_dates column
+        const kd = sp.key_dates || {};
+        return {
+          _dbId: sp.id,               // Keep Supabase UUID for updates
+          name: sp.name,
+          startDate: sp.start_date,
+          deliveryDate: sp.delivery_date,
+          dur: {
+            '設計部': dur['設計部'] || 50,
+            '調達部': dur['調達部'] || 55,
+            '工場':   dur['工場']   || 45,
+            '工事部': dur['工事部'] || 20,
+          },
+          keyDates: {
+            approval:    kd.approval    || '',
+            order:       kd.order       || '',
+            fabrication: kd.fabrication  || '',
+            delivery:    kd.delivery    || sp.delivery_date || '',
+          },
+          phases: {},
+          status: 'ok',
+          available: 0,
+          needed: 0,
+          overlap: { ol1: 0, ol2: 0 },
+          sort_order: sp.sort_order,
+        };
+      });
+
+    return {
+      _dbId: p.id,                 // Keep Supabase UUID for updates
+      id: p.project_code,          // Your visible ID (P-2601)
+      name: p.name,
+      subs: subs.length > 0 ? subs : [],
+      status: 'ok',
+      oStart: null,
+      oEnd: null,
+    };
+  });
+
+  // Recalculate scheduling for every project (same logic as before)
+  projects.forEach(p => calcProj(p));
+
+  // Update projCtr so new project IDs don't collide
+  const maxNum = projects.reduce((mx, p) => {
+    const m = p.id.match(/P-26(\d+)/);
+    return m ? Math.max(mx, parseInt(m[1])) : mx;
+  }, 0);
+  projCtr = maxNum + 1;
+
+  console.log('[PMS] projects[] rebuilt:', projects.length, 'projects,',
+    projects.reduce((a, p) => a + p.subs.length, 0), 'sub-projects');
+  console.log('[PMS] projCtr set to:', projCtr);
+}
+
+// ── Save a sub-project back to Supabase ──
+async function saveSubToDb(p, s) {
+  const payload = {
+    project_id: p._dbId,
+    name: s.name,
+    start_date: s.startDate,
+    delivery_date: s.deliveryDate,
+    durations: {
+      '設計部': s.dur['設計部'],
+      '調達部': s.dur['調達部'],
+      '工場':   s.dur['工場'],
+      '工事部': s.dur['工事部'],
+    },
+    key_dates: {
+      approval:    s.keyDates.approval,
+      order:       s.keyDates.order,
+      fabrication: s.keyDates.fabrication,
+      delivery:    s.keyDates.delivery,
+    },
+    status: s.status,
+    available_days: s.available,
+    needed_days: s.needed,
+    overlap_design_procurement: s.overlap?.ol1 || 0,
+    overlap_procurement_factory: s.overlap?.ol2 || 0,
+    sort_order: s.sort_order || 0,
+  };
+
+  if (s._dbId) {
+    // UPDATE existing
+    console.log('[PMS] Updating sub_project:', s._dbId, payload);
+    const { error } = await sb.from('sub_projects').update(payload).eq('id', s._dbId);
+    if (error) console.error('[PMS] Update sub ERROR:', error);
+  } else {
+    // INSERT new
+    console.log('[PMS] Inserting new sub_project:', payload);
+    const { data, error } = await sb.from('sub_projects').insert(payload).select();
+    if (error) console.error('[PMS] Insert sub ERROR:', error);
+    else if (data && data[0]) s._dbId = data[0].id;
+  }
+}
+
+// ── Save project header to Supabase ──
+async function saveProjToDb(p) {
+  const payload = {
+    project_code: p.id,
+    name: p.name,
+    status: p.status,
+    overall_start: p.oStart ? fmt(p.oStart) : null,
+    overall_end: p.oEnd ? fmt(p.oEnd) : null,
+  };
+  console.log('[PMS] Updating project:', p._dbId, payload);
+  const { error } = await sb.from('projects').update(payload).eq('id', p._dbId);
+  if (error) console.error('[PMS] Update project ERROR:', error);
+}
+
+// ═══════════════════════════════════════════════════
+//  MODIFIED CRUD FUNCTIONS (was: local array only)
+//  Now: write to Supabase → re-fetch → re-render
+// ═══════════════════════════════════════════════════
+
+async function saveProjInfo() {
+  const p = projects.find(x => x.id === selProjId); if (!p) return;
+  const nid = document.getElementById('fId').value.trim();
+  p.name = document.getElementById('fNm').value.trim();
+  if (nid && nid !== p.id) { p.id = nid; selProjId = nid; }
+  calcProj(p);
+
+  // ── Write to Supabase ──
+  await saveProjToDb(p);
+  console.log('[PMS] saveProjInfo complete');
+
+  renderTree(); renderForm();
+}
+
+async function saveSubInfo() {
+  const p = projects.find(x => x.id === selProjId); if (!p) return;
+  const s = p.subs[selSubIdx]; if (!s) return;
+
+  // Read form values (same as before)
+  s.name = document.getElementById('fSN').value.trim();
+  s.startDate = document.getElementById('fSD').value;
+  s.deliveryDate = document.getElementById('fDD').value;
+  s.dur['設計部'] = parseInt(document.getElementById('fDs').value) || 50;
+  s.dur['調達部'] = parseInt(document.getElementById('fDc').value) || 55;
+  s.dur['工場']   = parseInt(document.getElementById('fDk').value) || 45;
+  s.dur['工事部'] = parseInt(document.getElementById('fDi').value) || 20;
+  s.keyDates.approval = document.getElementById('fKA').value;
+  s.keyDates.order = document.getElementById('fKO').value;
+  s.keyDates.fabrication = document.getElementById('fKF').value;
+  s.keyDates.delivery = s.deliveryDate;
+
+  // Recalculate (same as before)
+  calcProj(p);
+
+  // ── Write to Supabase ──
+  await saveSubToDb(p, s);
+  await saveProjToDb(p);  // Update project status/dates too
+  console.log('[PMS] saveSubInfo complete for:', s.name);
+
+  renderTree(); renderForm();
+}
+
+async function addSub() {
+  const p = projects.find(x => x.id === selProjId); if (!p) return;
+  const dd = fmt(addD(new Date(), 180));
+  const newSub = mkSub('新規サブPJ', fmt(new Date()), dd, 50, 55, 45, 20, '', '', '');
+  newSub.sort_order = p.subs.length;
+
+  // ── Insert into Supabase first ──
+  const payload = {
+    project_id: p._dbId,
+    name: newSub.name,
+    start_date: newSub.startDate,
+    delivery_date: newSub.deliveryDate,
+    durations: newSub.dur,
+    key_dates: newSub.keyDates,
+    status: 'ok',
+    available_days: 0,
+    needed_days: 0,
+    sort_order: newSub.sort_order,
+  };
+  console.log('[PMS] addSub — inserting:', payload);
+  const { data, error } = await sb.from('sub_projects').insert(payload).select();
+  if (error) { console.error('[PMS] addSub ERROR:', error); return; }
+  newSub._dbId = data[0].id;
+  console.log('[PMS] addSub — new UUID:', newSub._dbId);
+
+  // Add to local array and recalculate
+  p.subs.push(newSub);
+  calcProj(p);
+  await saveProjToDb(p);
+  selSubIdx = p.subs.length - 1;
+  renderTree(); renderForm();
+}
+
+async function delSub() {
+  const p = projects.find(x => x.id === selProjId);
+  if (!p || p.subs.length <= 1) return;
+  if (!confirm(`「${p.subs[selSubIdx].name}」を削除？`)) return;
+
+  const sub = p.subs[selSubIdx];
+  console.log('[PMS] delSub — deleting:', sub._dbId, sub.name);
+
+  // ── Delete from Supabase ──
+  if (sub._dbId) {
+    const { error } = await sb.from('sub_projects').delete().eq('id', sub._dbId);
+    if (error) { console.error('[PMS] delSub ERROR:', error); return; }
+  }
+
+  // Remove from local array
+  p.subs.splice(selSubIdx, 1);
+  selSubIdx = Math.min(selSubIdx, p.subs.length - 1);
+  calcProj(p);
+  await saveProjToDb(p);
+  renderTree(); renderForm();
+}
+
+async function addProj() {
+  const code = `P-26${String(projCtr++).padStart(2, '0')}`;
+  const sd = fmt(new Date()), dd = fmt(addD(new Date(), 180));
+
+  console.log('[PMS] addProj — creating:', code);
+
+  // ── Insert project into Supabase ──
+  const { data: projData, error: projErr } = await sb
+    .from('projects')
+    .insert({ project_code: code, name: '新規プロジェクト', status: 'ok' })
+    .select();
+  if (projErr) {
+    console.error('[PMS] addProj ERROR:', projErr);
+    alert('プロジェクト作成エラー: ' + (projErr.message || JSON.stringify(projErr)));
+    projCtr--;  // Roll back counter on failure
+    return;
+  }
+
+  const newProjDbId = projData[0].id;
+  console.log('[PMS] addProj — project UUID:', newProjDbId);
+
+  // ── Insert default sub-project ──
+  const defSub = mkSub('鉄骨本体', sd, dd, 60, 60, 50, 25, '', '', '');
+  const { data: subData, error: subErr } = await sb
+    .from('sub_projects')
+    .insert({
+      project_id: newProjDbId,
+      name: defSub.name,
+      start_date: defSub.startDate,
+      delivery_date: defSub.deliveryDate,
+      durations: defSub.dur,
+      key_dates: defSub.keyDates,
+      status: 'ok',
+      sort_order: 0,
+    })
+    .select();
+  if (subErr) { console.error('[PMS] addProj sub ERROR:', subErr); return; }
+  defSub._dbId = subData[0].id;
+
+  // Add to local array
+  const newProj = {
+    _dbId: newProjDbId,
+    id: code,
+    name: '新規プロジェクト',
+    subs: [defSub],
+    status: 'ok',
+    oStart: null,
+    oEnd: null,
+  };
+  calcProj(newProj);
+  projects.push(newProj);
+
+  selProjId = code;
+  selSubIdx = 0;
+  renderTree(); renderForm();
+}
+
+async function delProj() {
+  if (!selProjId) return;
+  if (!confirm(`${selProjId} を削除？`)) return;
+
+  const p = projects.find(x => x.id === selProjId);
+  console.log('[PMS] delProj — deleting:', p?._dbId, selProjId);
+
+  // ── Delete from Supabase (CASCADE deletes sub_projects too) ──
+  if (p && p._dbId) {
+    const { error } = await sb.from('projects').delete().eq('id', p._dbId);
+    if (error) { console.error('[PMS] delProj ERROR:', error); return; }
+  }
+
+  // Remove from local array
+  projects = projects.filter(x => x.id !== selProjId);
+  selProjId = null;
+  selSubIdx = 0;
+  renderTree(); renderForm();
+}
+
+// ═══════════════════════════════════════════════════
+//  GANTT CHART — Full width, clean, no M-numbers
+// ═══════════════════════════════════════════════════
+const LP=200,TP=72,PH_H=26,SPH_H=20,DR_H=26,BAR_H=15,PROJ_GAP=6,SP_BLK=SPH_H+4*DR_H;
+const FN='"Segoe UI","Yu Gothic UI",sans-serif';
+
+function ppd(){return parseFloat(document.getElementById('zSel').value)||4}
+function getRange(){
+  let mn=null,mx=null;
+  projects.forEach(p=>{if(p.oStart&&(!mn||p.oStart<mn))mn=p.oStart;if(p.oEnd&&(!mx||p.oEnd>mx))mx=p.oEnd});
+  if(!mn){mn=new Date();mx=addD(mn,360)}
+  mn=addD(mn,-20);mx=addD(mx,30);
+  mn=new Date(mn.getFullYear(),mn.getMonth(),1);mx=new Date(mx.getFullYear(),mx.getMonth()+1,0);
+  return{mn,mx};
+}
+function projH(p){return PH_H+p.subs.length*SP_BLK+PROJ_GAP}
+
+function renderGantt(){
+  const cv=document.getElementById('gc'),ctx=cv.getContext('2d');
+  const px=ppd(),{mn,mx}=getRange(),totD=dB(mn,mx);
+  const W=LP+totD*px+30;let totH=TP;projects.forEach(p=>{totH+=projH(p)});totH+=20;
+  cv.width=W;cv.height=totH;
+  function dx(d){return LP+dB(mn,d)*px}
+
+  ctx.fillStyle='#0d1524';ctx.fillRect(0,0,W,totH);
+
+  // Date axis
+  const MN=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  let cur=new Date(mn);
+  while(cur<=mx){
+    const x1=dx(cur),nm=new Date(cur.getFullYear(),cur.getMonth()+1,1),x2=Math.min(dx(nm),W),mid=(x1+x2)/2;
+    if(cur.getMonth()%2===0){ctx.fillStyle='rgba(255,255,255,.025)';ctx.fillRect(x1,TP,x2-x1,totH-TP)}
+    ctx.strokeStyle='rgba(45,63,90,.8)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x1,12);ctx.lineTo(x1,totH);ctx.stroke();
+    if(cur.getMonth()===0||cur.getTime()===mn.getTime()){ctx.fillStyle='#7a91b0';ctx.font=`bold 10px ${FN}`;ctx.textAlign='center';ctx.fillText(cur.getFullYear()+'年',mid,14)}
+    ctx.fillStyle='#c8d8f0';ctx.font=`bold 11px ${FN}`;ctx.textAlign='center';ctx.fillText(MN[cur.getMonth()],mid,32);
+    const dim=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
+    let marks=px>=5?[1,5,10,15,20,25]:px>=4?[1,8,15,22]:[1,15];
+    marks.forEach(day=>{if(day>dim)return;const dd2=new Date(cur.getFullYear(),cur.getMonth(),day),xx=dx(dd2);if(xx<LP||xx>W)return;ctx.strokeStyle='rgba(122,145,176,.35)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xx,TP-18);ctx.lineTo(xx,TP-12);ctx.stroke();ctx.fillStyle='#7a91b0';ctx.font=`9px ${FN}`;ctx.textAlign='center';ctx.fillText(`${cur.getMonth()+1}/${day}`,xx,TP-3)});
+    cur=nm;
+  }
+
+  // Header chrome
+  ctx.fillStyle='#131e30';ctx.fillRect(0,0,LP,totH);
+  ctx.fillStyle='#1a2640';ctx.fillRect(0,0,W,TP);
+  ctx.strokeStyle='#2d3f5a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,TP);ctx.lineTo(W,TP);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(LP,0);ctx.lineTo(LP,totH);ctx.stroke();
+  ctx.fillStyle='#7a91b0';ctx.font=`bold 9px ${FN}`;ctx.textAlign='left';ctx.fillText('プロジェクト / 部門',8,TP-22);
+  ctx.fillStyle='#94a3b8';ctx.font=`9px ${FN}`;ctx.textAlign='right';ctx.fillText('年',LP-8,14);ctx.fillText('月',LP-8,32);ctx.fillText('日付',LP-8,TP-3);
+
+  // Render projects
+  let yOff=TP;const keyLabels=[];
+
+  projects.forEach(p=>{
+    const bY=yOff;
+    // Project header
+    ctx.fillStyle=p.status==='ok'?'#15243a':'#251a1e';ctx.fillRect(0,bY,W,PH_H);
+    ctx.fillStyle='#4f8ef7';ctx.font=`bold 11px ${FN}`;ctx.textAlign='left';
+    ctx.fillText(`${p.id}  ${p.name}`,8,bY+17);
+    // status badge
+    ctx.fillStyle=p.status==='ok'?'#10b981':'#ef4444';ctx.font=`bold 9px ${FN}`;ctx.textAlign='right';
+    ctx.fillText(p.status==='ok'?'✅ 正常':'⚠ リスク',LP-8,bY+17);
+    // overall bar
+    if(p.oStart&&p.oEnd){const ox1=dx(p.oStart),ox2=dx(p.oEnd);ctx.fillStyle='rgba(79,142,247,.18)';ctx.fillRect(ox1,bY+8,ox2-ox1,10);ctx.strokeStyle='rgba(79,142,247,.4)';ctx.lineWidth=1;ctx.strokeRect(ox1,bY+8,ox2-ox1,10)}
+
+    let sY=bY+PH_H;
+    p.subs.forEach((sub,si)=>{
+      if(!sub.phases||!sub.phases['設計部']){sY+=SP_BLK;return}
+      // Sub header
+      const stCol=sub.status==='ok'?'#10b981':'#ef4444';
+      ctx.fillStyle=si%2===0?'#172035':'#141c30';ctx.fillRect(0,sY,LP,SPH_H);
+      ctx.fillStyle='#1a2640';ctx.fillRect(LP,sY,W-LP,SPH_H);
+      ctx.fillStyle=stCol;ctx.font=`bold 10px ${FN}`;ctx.textAlign='left';
+      ctx.fillText(sub.status==='ok'?'●':'▲',8,sY+14);
+      ctx.fillStyle='#94a3b8';ctx.font=`bold 10px ${FN}`;
+      ctx.fillText(`${sub.name}`,22,sY+14);
+      ctx.fillStyle='#7a91b0';ctx.font=`9px ${FN}`;ctx.textAlign='right';
+      ctx.fillText(`着工:${sub.startDate}  搬入:${sub.deliveryDate}`,LP-6,sY+14);
+      ctx.strokeStyle='rgba(45,63,90,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,sY+SPH_H);ctx.lineTo(W,sY+SPH_H);ctx.stroke();
+
+      // Dept rows
+      DN.forEach((dn,di)=>{
+        const ry=sY+SPH_H+di*DR_H,ph=sub.phases[dn],col=DC[dn].color;
+        ctx.fillStyle=di%2===0?'rgba(255,255,255,.012)':'rgba(0,0,0,.08)';ctx.fillRect(LP,ry,W-LP,DR_H);
+        ctx.fillStyle=di%2===0?'#131e2f':'#111b2a';ctx.fillRect(0,ry,LP,DR_H);
+        ctx.fillStyle=col;ctx.fillRect(20,ry+6,3,DR_H-12);
+        ctx.fillStyle=col;ctx.font=`bold 9px ${FN}`;ctx.textAlign='left';ctx.fillText(dn,30,ry+DR_H/2+3);
+        ctx.strokeStyle='rgba(45,63,90,.25)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(LP,ry+DR_H);ctx.lineTo(W,ry+DR_H);ctx.stroke();
+
+        // Phase bar
+        const bx1=dx(ph.start),bx2=dx(ph.end),bw=bx2-bx1,by=ry+(DR_H-BAR_H)/2;
+        if(bw>0){
+          const r=Math.min(4,bw/2);
+          ctx.fillStyle=col+'88';ctx.beginPath();
+          ctx.moveTo(bx1+r,by);ctx.lineTo(bx2-r,by);ctx.quadraticCurveTo(bx2,by,bx2,by+r);ctx.lineTo(bx2,by+BAR_H-r);ctx.quadraticCurveTo(bx2,by+BAR_H,bx2-r,by+BAR_H);ctx.lineTo(bx1+r,by+BAR_H);ctx.quadraticCurveTo(bx1,by+BAR_H,bx1,by+BAR_H-r);ctx.lineTo(bx1,by+r);ctx.quadraticCurveTo(bx1,by,bx1+r,by);ctx.closePath();ctx.fill();
+          ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(bx1,by,bw,3);
+          ctx.strokeStyle=col;ctx.lineWidth=1;ctx.stroke();
+          if(bw>28){ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`bold 8px ${FN}`;ctx.textAlign='center';ctx.fillText(dB(ph.start,ph.end)+'日',bx1+bw/2,by+BAR_H/2+3)}
+        }
+
+        // Gap indicator for healthy projects (between 調達部 and 工場)
+        if(sub.status==='ok'&&dn==='調達部'){
+          const gapStart=ph.end,gapEnd=sub.phases['工場'].start;
+          if(gapEnd>gapStart){
+            const gx1=dx(gapStart),gx2=dx(gapEnd);
+            ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(122,145,176,.3)';ctx.lineWidth=1;
+            ctx.beginPath();ctx.moveTo(gx1,by+BAR_H/2);ctx.lineTo(gx2,by+BAR_H/2);ctx.stroke();ctx.setLineDash([]);
+            const gapD=dB(gapStart,gapEnd);
+            if(gx2-gx1>20){ctx.fillStyle='rgba(122,145,176,.5)';ctx.font=`8px ${FN}`;ctx.textAlign='center';ctx.fillText(`${gapD}日余裕`,(gx1+gx2)/2,by+BAR_H/2-4)}
+          }
+        }
+
+        // Overlap hatching for risky projects
+        if(sub.status==='risk'){
+          const nxt=DN[di+1];
+          if(nxt&&sub.phases[nxt]){
+            const nph=sub.phases[nxt];
+            if(nph.start<ph.end){
+              const ox1=dx(nph.start),ox2=dx(ph.end);
+              if(ox2>ox1){ctx.save();ctx.globalAlpha=.22;ctx.fillStyle='#f59e0b';for(let sx=ox1-BAR_H;sx<ox2;sx+=6){ctx.beginPath();ctx.moveTo(sx,by+BAR_H);ctx.lineTo(sx+BAR_H,by);ctx.lineTo(sx+BAR_H+2,by);ctx.lineTo(sx+2,by+BAR_H);ctx.closePath();ctx.fill()}ctx.restore()}
+            }
+          }
+        }
+      });
+
+      // Key milestone markers
+      Object.entries(sub.keyDates).forEach(([key,val])=>{
+        if(!val)return;
+        const d=par(val);if(!d)return;
+        const col=KEY_COLORS[key],label=KEY_NAMES[key],dept=KEY_DEPT[key];
+        // Find which dept row this goes on
+        const di=DN.indexOf(dept);if(di<0)return;
+        const ry=sY+SPH_H+di*DR_H;
+        const mx2=dx(d),cy=ry+DR_H/2,by=ry+(DR_H-BAR_H)/2;
+        const rr=6;
+        // Diamond
+        ctx.shadowColor=col;ctx.shadowBlur=4;
+        ctx.fillStyle='#ffffff';ctx.strokeStyle=col;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(mx2,cy-rr);ctx.lineTo(mx2+rr,cy);ctx.lineTo(mx2,cy+rr);ctx.lineTo(mx2-rr,cy);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.shadowBlur=0;
+        // Collect for label rendering
+        keyLabels.push({x:mx2,y:by-2,label:`${label} ${fmtS(d)}`,col});
+      });
+
+      sY+=SP_BLK;
+    });
+
+    yOff+=projH(p);
+    ctx.strokeStyle='rgba(79,142,247,.12)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,yOff-PROJ_GAP);ctx.lineTo(W,yOff-PROJ_GAP);ctx.stroke();
+  });
+
+  // Key milestone date labels (top layer)
+  keyLabels.forEach(({x,y,label,col})=>{
+    ctx.font=`bold 8px ${FN}`;const tw=ctx.measureText(label).width;
+    const pw=tw+8,ph2=14,px2=x-pw/2,py=y-ph2-2,rr=3;
+    ctx.fillStyle='#0d1524';ctx.globalAlpha=.9;
+    ctx.beginPath();ctx.moveTo(px2+rr,py);ctx.lineTo(px2+pw-rr,py);ctx.quadraticCurveTo(px2+pw,py,px2+pw,py+rr);ctx.lineTo(px2+pw,py+ph2-rr);ctx.quadraticCurveTo(px2+pw,py+ph2,px2+pw-rr,py+ph2);ctx.lineTo(px2+rr,py+ph2);ctx.quadraticCurveTo(px2,py+ph2,px2,py+ph2-rr);ctx.lineTo(px2,py+rr);ctx.quadraticCurveTo(px2,py,px2+rr,py);ctx.closePath();ctx.fill();
+    ctx.globalAlpha=1;ctx.strokeStyle=col;ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle=col;ctx.textAlign='center';ctx.fillText(label,x,py+10);
+    ctx.strokeStyle=col+'55';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,py+ph2);ctx.lineTo(x,y+4);ctx.stroke();
+  });
+
+  // Today line
+  const today=new Date();today.setHours(0,0,0,0);
+  if(today>=mn&&today<=mx){const tx=dx(today);ctx.strokeStyle='#f43f5e';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.beginPath();ctx.moveTo(tx,0);ctx.lineTo(tx,totH);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#f43f5e';ctx.font=`bold 10px ${FN}`;ctx.textAlign='center';ctx.fillText('TODAY '+fmtS(today),tx,10)}
+
+  document.getElementById('zInfo').textContent=`${fmt(mn)} 〜 ${fmt(mx)}（${totD}日 / ${projects.length}PJ）`;
+}
+
+// ═══════════════════════════════════════════════════
+//  WORKLOAD
+// ═══════════════════════════════════════════════════
+function renderWorkload(){
+  const{mn,mx}=getRange();
+  const months=[];let c=new Date(mn.getFullYear(),mn.getMonth(),1);const end=new Date(mx.getFullYear(),mx.getMonth()+1,1);
+  while(c<end){months.push(new Date(c));c=new Date(c.getFullYear(),c.getMonth()+1,1)}
+  const labels=months.map(m=>`${m.getFullYear()}/${String(m.getMonth()+1).padStart(2,'0')}`);
+  document.getElementById('wlRange').textContent=`部門別・月別 稼働状況 — ${fmt(mn)} 〜 ${fmt(mx)}`;
+  const allS=[];projects.forEach(p=>p.subs.forEach(s=>{if(s.phases&&s.phases['設計部'])allS.push({proj:p,sub:s})}));
+  const dd={};DN.forEach(dn=>{dd[dn]=months.map(m=>{const mS=m,mE=new Date(m.getFullYear(),m.getMonth()+1,0);return allS.filter(({sub})=>{const ph=sub.phases[dn];return ph.start<=mE&&ph.end>=mS}).length})});
+
+  document.getElementById('statRow').innerHTML=DN.map(d=>{const col=DC[d].color;const pk=Math.max(...dd[d]);const ci=months.findIndex(m=>{const n=new Date();n.setHours(0,0,0,0);return n>=m&&n<=new Date(m.getFullYear(),m.getMonth()+1,0)});return`<div class="sc" style="border-top-color:${col}"><div class="sl">${d}</div><div class="sv" style="color:${col}">${ci>=0?dd[d][ci]:0}</div><div class="ss">現在稼働 / ピーク ${pk}</div></div>`}).join('');
+
+  const ctx2=document.getElementById('wlBar').getContext('2d');
+  if(wlBarI)wlBarI.destroy();
+  wlBarI=new Chart(ctx2,{type:'bar',data:{labels,datasets:DN.map(d=>({label:d,data:dd[d],backgroundColor:DC[d].color+'cc',borderColor:DC[d].color,borderWidth:1,borderRadius:3}))},options:{responsive:true,interaction:{mode:'index'},plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#7a91b0',font:{size:10}},grid:{color:'rgba(45,63,90,.5)'}},y:{ticks:{color:'#7a91b0',stepSize:1},grid:{color:'rgba(45,63,90,.5)'},title:{display:true,text:'稼働サブPJ数',color:'#7a91b0'}}}}});
+
+  const rows=allS.map(({proj:p,sub:s})=>{
+    const dur=dB(s.phases['設計部'].start,s.phases['工事部'].end);
+    const stC=s.status==='ok'?'st-ok':'st-risk';const stT=s.status==='ok'?'✅ 正常':'⚠ リスク';
+    const cells=DN.map(dn=>{const d=dB(s.phases[dn].start,s.phases[dn].end);return`<td><span class="badge" style="background:${DC[dn].color}">${d}日</span></td>`}).join('');
+    return`<tr><td><strong>${p.id}</strong></td><td>${s.name}</td><td>${s.startDate}</td><td style="color:var(--ok)">${s.deliveryDate}</td><td><span class="pt-st ${stC}">${stT}</span></td><td>${dur}日</td>${cells}</tr>`;
+  }).join('');
+  document.getElementById('wlTbl').innerHTML=`<thead><tr><th>PJ</th><th>サブPJ</th><th>着工日</th><th>搬入日</th><th>状態</th><th>総工期</th>${DN.map(d=>`<th style="color:${DC[d].color}">${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  SUPABASE AUTH
+// ═══════════════════════════════════════════════════
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ⚠️  REPLACE THESE WITH YOUR REAL SUPABASE KEYS  ⚠️
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SUPABASE_URL  = 'https://cmssidcmnzadwrvyiiib.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtc3NpZGNtbnphZHdydnlpaWliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNzAwMDksImV4cCI6MjA5MTY0NjAwOX0.VEQKlOPJ6Y-74ztPh1b32isVP2VFaB2wdKQN3CLdLcs';
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let authMode = 'login';  // 'login' or 'signup'
+let appEntered = false;   // Guard against double enterApp()
+
+// ── Switch between Login / Signup tabs ──
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('on', (mode === 'login' && i === 0) || (mode === 'signup' && i === 1));
+  });
+  document.getElementById('nameField').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('authSubmit').textContent = mode === 'login' ? 'ログイン' : '新規登録';
+  document.getElementById('authPass').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  clearAuthMsg();
+}
+
+// ── Show message below form ──
+function showAuthMsg(text, type) {
+  const el = document.getElementById('authMsg');
+  el.textContent = text;
+  el.className = 'auth-msg ' + type;  // 'err' or 'ok'
+}
+function clearAuthMsg() {
+  const el = document.getElementById('authMsg');
+  el.className = 'auth-msg';
+  el.textContent = '';
+}
+
+// ── Handle form submit (login or signup) ──
+async function handleAuth(e) {
+  e.preventDefault();
+  const btn = document.getElementById('authSubmit');
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const name  = document.getElementById('authName').value.trim();
+
+  btn.disabled = true;
+  clearAuthMsg();
+
+  try {
+    if (authMode === 'signup') {
+      // ── SIGNUP ──
+      const { data, error } = await sb.auth.signUp({
+        email,
+        password: pass,
+        options: {
+          data: { full_name: name || email.split('@')[0] }
+        }
+      });
+      if (error) throw error;
+
+      // Supabase may require email confirmation
+      if (data.user && !data.session) {
+        showAuthMsg('確認メールを送信しました。メール内のリンクをクリックしてください。', 'ok');
+      } else if (data.session) {
+        // Auto-confirmed (e.g., when email confirmation is disabled)
+        enterApp(data.session);
+      }
+
+    } else {
+      // ── LOGIN ──
+      const { data, error } = await sb.auth.signInWithPassword({
+        email,
+        password: pass
+      });
+      if (error) throw error;
+      enterApp(data.session);
+    }
+  } catch (err) {
+    const msg = err.message || 'エラーが発生しました';
+    // Translate common Supabase error messages
+    const translations = {
+      'Invalid login credentials': 'メールアドレスまたはパスワードが正しくありません',
+      'User already registered': 'このメールアドレスは既に登録されています',
+      'Password should be at least 6 characters': 'パスワードは6文字以上にしてください',
+      'Unable to validate email address: invalid format': 'メールアドレスの形式が正しくありません',
+      'Email rate limit exceeded': 'しばらく時間を置いてから再度お試しください',
+    };
+    showAuthMsg(translations[msg] || msg, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+  return false;
+}
+
+// ── Logout ──
+async function handleLogout() {
+  await sb.auth.signOut();
+  exitApp();
+}
+
+// ── Show PMS, hide auth, LOAD DATA FROM SUPABASE ──
+async function enterApp(session) {
+  // Guard: prevent double-entry (onAuthStateChange + init both fire)
+  if (appEntered) {
+    console.log('[PMS] enterApp — already entered, skipping');
+    return;
+  }
+  appEntered = true;
+
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.add('visible');
+
+  // Display user info in header
+  const user = session.user;
+  const displayName = user.user_metadata?.full_name || user.email;
+  document.getElementById('userName').textContent = displayName;
+  console.log('[PMS] enterApp — user:', user.id, displayName);
+
+  // ── Load all projects from Supabase ──
+  await fetchProjects();
+
+  // Now render with real data
+  renderTree();
+  renderForm();
+  console.log('[PMS] enterApp — UI rendered with', projects.length, 'projects');
+}
+
+// ── Show auth, hide PMS, CLEAR LOCAL DATA ──
+function exitApp() {
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('appShell').classList.remove('visible');
+  // Clear local data so next user starts fresh
+  projects = [];
+  selProjId = null;
+  selSubIdx = 0;
+  projCtr = 1;
+  appEntered = false;  // Reset guard so next login can enter
+  console.log('[PMS] exitApp — local data cleared');
+  // Reset form
+  document.getElementById('authForm').reset();
+  clearAuthMsg();
+  switchAuthTab('login');
+}
+
+// ── Listen for auth state changes (handles tab switches, token refresh) ──
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    enterApp(session);
+  } else if (event === 'SIGNED_OUT') {
+    exitApp();
+  }
+});
+
+// ═══════════════════════════════════════════════════
+//  INIT — check for existing session
+// ═══════════════════════════════════════════════════
+(async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    enterApp(session);
+  }
+  // If no session, authScreen is already visible (default)
+})();
+
+window.addEventListener('resize', () => {
+  if (document.getElementById('pgGantt').classList.contains('on')) renderGantt();
+});
+</script>
+
+</body>
+</html>
